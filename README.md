@@ -3,7 +3,7 @@ Powershell cmdlet to help you keep track of your CouchBase views
 
 
 ###Usage
-After you bild the project go to debig/release copy all the files and place them into 
+After you build the project go to debig/release copy all the files and place them into 
 
 `Documents\WindowsPowerShell\Modules\CouchMan`
 
