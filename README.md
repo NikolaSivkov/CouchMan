@@ -3,6 +3,10 @@ Powershell cmdlet to help you keep track of your CouchBase views
 
 
 ###Usage
+After you bild the project go to debig/release copy all the files and place them into 
+
+`Documents\WindowsPowerShell\Modules\CouchMan`
+
 Cd to the directory where your bucket folder is located and type this :
 
 `Push-Couch -AdminUsername Administrator -AdminPassword **********`
