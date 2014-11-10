@@ -11,7 +11,8 @@ or `Push-Couch -u Administrator -pw **********`
 
 ####Optional parameters
 
-`-InstaceUri ( aliases : uri, url) "http://yourcbaddress:8091/pools"
+`-InstaceUri ( aliases : uri, url) "http://yourcbaddress:8091/pools"`
+
 Default value : "http://localhost:8091/pools"
 
 ####Directory Structure
