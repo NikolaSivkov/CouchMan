@@ -1,15 +1,36 @@
 #CouchMan
-========
-
 Powershell cmdlet to help you keep track of your CouchBase views
 
 
-###Sample bucket configuration file
-========
+###Usage
+Cd to the directory where your bucket folder is located and type this :
 
-You should place 1 file 
+`Push-Couch -AdminUsername Administrator -AdminPassword **********`
+
+or `Push-Couch -u Administrator -pw **********`
+
+####Optional parameters
+
+`-InstaceUri ( aliases : uri, url) "http://yourcbaddress:8091/pools"
+Default value : "http://localhost:8091/pools"
+
+####Directory Structure
+    Root folder >
+		|BeersBucket >
+			|config.json
+    			|Breweries >
+    				|by_id.js    // your view name
+    				|by_beerIds.js
+    			|Beers >
+    				|by_name.js
+    				|by_importerName.js
+
+
+
+###Sample bucket config.json file
+
+You should place 1 file in the bucket folder next to the designs folders
 The values in this json that are 0, null or false can be omitted 
-
 
 #####Short Version : 
 
@@ -61,3 +82,11 @@ The values in this json that are 0, null or false can be omitted
 }
 ```
 
+###Sample Views .js file
+
+
+```javascript
+function (doc, meta) {
+  emit(meta.id, doc);
+}
+```
