@@ -1,6 +1,6 @@
 #CouchMan
-Powershell cmdlet to help you keep track of your CouchBase views
 
+Working with couchbase in a team is a hard task. There is simply no way to keep track of the changes anyone made to the views. So i've built this little tool to help you keep your views in source control such as Git.
 
 ###Usage
 After you build the project go to debig/release copy all the files and place them into 
