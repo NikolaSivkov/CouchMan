@@ -4,7 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Net;
+using Couchbase;
 using Couchbase.Configuration;
+using Couchbase.Configuration.Client;
+using Couchbase.Configuration.Server.Serialization;
 using Couchbase.Management;
 using Newtonsoft.Json;
 
@@ -38,33 +41,53 @@ namespace CouchMan
         [Parameter(Mandatory = false)]
         public string InstanceUri { get; set; }
 
+        [Alias("b")]
+        [Parameter(Mandatory = false)]
+        public string Bucket { get; set; }
+
         protected override void ProcessRecord()
         {
-            var cbConfig = new CouchbaseClientConfiguration()
-            {
-                Username = AdminUsername,
-                Password = AdminPassword
-            };
 
-            cbConfig.Urls.Add(new Uri(InstanceUri));
+            var clientConfig = new ClientConfiguration();
 
-            var cbc = new CouchbaseCluster(cbConfig);
-            Bucket[] remoteBuckets = new Bucket[1];
-            try
+            clientConfig.Servers.Add(new Uri(InstanceUri));
+
+            var cbc = new Cluster(clientConfig);
+
+            var clusterManager = cbc.CreateManager(AdminUsername, AdminPassword);
+
+            var remoteBuckets = new List<BucketConfig>();
+
+            var resultListBuckets = clusterManager.ListBuckets();
+            if (resultListBuckets.Success != true)
             {
-                remoteBuckets = cbc.ListBuckets();
-            }
-            catch (Exception ex)
-            {
-                WriteError(new ErrorRecord(ex, "Cannot connect to server:" + InstanceUri, ErrorCategory.ConnectionError, InstanceUri));
+                WriteError(new ErrorRecord(new Exception("Cannot connect to server" + InstanceUri), "Cannot connect to server:" + InstanceUri, ErrorCategory.ConnectionError, InstanceUri));
                 return;
             }
 
+            remoteBuckets = resultListBuckets.Value.ToList();
+
+
+
+
+
             var localBucketsPath = this.SessionState.Path.CurrentFileSystemLocation.Path;
             WriteDebug("localBucketsPath:" + localBucketsPath);
+
             //get list of local buckets
             var localBucketsPaths = Directory.EnumerateDirectories(localBucketsPath, "*", SearchOption.TopDirectoryOnly);
 
+            if (!string.IsNullOrEmpty(Bucket))
+            {
+                remoteBuckets = remoteBuckets.Where(x => String.Equals(x.Name, Bucket, StringComparison.CurrentCultureIgnoreCase)).ToList();
+                localBucketsPaths = localBucketsPaths.Where(x => String.Equals(new DirectoryInfo(x).Name, Bucket, StringComparison.CurrentCultureIgnoreCase)).ToList();
+
+                if (!remoteBuckets.Any())
+                {
+                    WriteError(new ErrorRecord(new Exception("No bucket with name " + Bucket), "No bucket with name " + Bucket, ErrorCategory.ObjectNotFound, Bucket));
+                    return;
+                }
+            }
 
             foreach (var localbucketPath in localBucketsPaths)
             {
@@ -85,53 +108,68 @@ namespace CouchMan
 
                 var jsonFile = File.ReadAllText(jsonFiles.FirstOrDefault());
 
-                var bucketFromConfigFile = new Bucket();
+                var bucketConfig = new LocalBucketConfiguration();
+
                 try
                 {
-                    bucketFromConfigFile = JsonConvert.DeserializeObject<Bucket>(jsonFile);
+                    bucketConfig = JsonConvert.DeserializeObject<LocalBucketConfiguration>(jsonFile);
                 }
                 catch (Exception ex)
                 {
-                    WriteDebug(JsonConvert.SerializeObject(bucketFromConfigFile));
-                    WriteError(new ErrorRecord(ex, "CannotParseConfigFile:" + localBucketName, ErrorCategory.WriteError, bucketFromConfigFile));
+                    WriteDebug(JsonConvert.SerializeObject(bucketConfig));
+                    WriteError(new ErrorRecord(ex, "CannotParseConfigFile:" + localBucketName, ErrorCategory.WriteError, bucketConfig));
                 }
 
                 // if we don't have bucket name in the config use the folder name
-                if (string.IsNullOrEmpty(bucketFromConfigFile.Name))
+                if (string.IsNullOrEmpty(bucketConfig.Name))
                 {
-                    bucketFromConfigFile.Name = localBucketName;
+                    bucketConfig.Name = localBucketName;
                 }
                 else
                 {
-                    localBucketName = bucketFromConfigFile.Name;
+                    localBucketName = bucketConfig.Name;
                 }
 
                 //if no remote buckets match the local folder name create one
                 if (!remoteBuckets.Any(x => x.Name == localBucketName))
                 {
-                    try
+
+                    var createBucketResult = clusterManager.CreateBucket(
+                            name: bucketConfig.Name,
+                            ramQuota: (uint)bucketConfig.RamQuota,
+                            bucketType: bucketConfig.BucketType,
+                            replicaNumber: bucketConfig.ReplicaNumber,
+                            authType: bucketConfig.AuthType,
+                            indexReplicas: bucketConfig.IndexReplicas,
+                            flushEnabled: bucketConfig.FlushEnabled,
+                            parallelDbAndViewCompaction: bucketConfig.ViewCompaction,
+                            saslPassword: bucketConfig.BucketPassword,
+                            threadNumber: bucketConfig.ThreadNumber
+                            );
+
+                    if (!createBucketResult.Success)
                     {
-                        cbc.CreateBucket(bucketFromConfigFile);
+                        WriteDebug(JsonConvert.SerializeObject(bucketConfig));
+                        WriteError(new ErrorRecord(createBucketResult.Exception, "CannotCreateBucket:" + localBucketName, ErrorCategory.WriteError, createBucketResult));
                     }
-                    catch (WebException ex)
-                    {
-                        WriteDebug(JsonConvert.SerializeObject(bucketFromConfigFile));
-                        WriteError(new ErrorRecord(ex, "CannotCreateBucket:" + localBucketName, ErrorCategory.WriteError, bucketFromConfigFile));
-                    }
+
                 }
 
+                var remoteBucketConfig = remoteBuckets.First(x => x.Name == localBucketName);
+
                 var designs = Directory.EnumerateDirectories(localbucketPath, "*", SearchOption.TopDirectoryOnly).ToList();
+                var remoteBucket = cbc.OpenBucket(remoteBucketConfig.Name, remoteBucketConfig.SaslPassword);
+                var remoteBucketManager = remoteBucket.CreateManager(AdminUsername, AdminPassword);
 
                 foreach (var design in designs)
                 {
                     var designDocs = new ViewsHolder();
                     var designName = new DirectoryInfo(design).Name;
 
-                    try
-                    {
-                        cbc.DeleteDesignDocument(localBucketName, designName);
-                    }
-                    catch (WebException ex)
+
+                    var removeDesignResult = remoteBucketManager.RemoveDesignDocument(designName);
+
+                    if (!removeDesignResult.Success)
                     {
                         WriteDebug("design " + designName + " doesn't exist.");
                     }
@@ -147,16 +185,17 @@ namespace CouchMan
                         designDocs.views.Add(viewName, new MapString(File.ReadAllText(view)));
                     }
 
-                    try
-                    {
-                        WriteObject("Attempting to create design: " + designName);
-                        cbc.CreateDesignDocument(localBucketName, designName, JsonConvert.SerializeObject(designDocs));
-                        WriteObject("Success creating design: " + designName);
-                    }
-                    catch (WebException ex)
+
+                    WriteObject("Attempting to create design: " + designName);
+                    var insertDesingResult = remoteBucketManager.InsertDesignDocument(designName, JsonConvert.SerializeObject(designDocs));
+
+                    if (!insertDesingResult.Success)
                     {
                         WriteWarning("CannotCreateDesign:" + designName);
-
+                    }
+                    else
+                    {
+                        WriteObject("Success creating design: " + designName);
                     }
                 }
             }
