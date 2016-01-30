@@ -145,8 +145,7 @@ namespace CouchMan
                 RamQuota = (bc.Quota.Ram/1024/1024),// the value is stored in bytes so we convert it back to megabytes
                 // and it should be done only when saving the config to local file
                 ReplicaNumber = (ReplicaNumber)bc.ReplicaNumber,
-                ThreadNumber = (ThreadNumber)bc.ThreadsNumber,
-                ViewCompaction = bc.AutoCompactionSettings
+                ThreadNumber = (ThreadNumber)bc.ThreadsNumber
             };
         }
 

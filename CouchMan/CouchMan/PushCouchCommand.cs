@@ -142,7 +142,6 @@ namespace CouchMan
                             authType: bucketConfig.AuthType,
                             indexReplicas: bucketConfig.IndexReplicas,
                             flushEnabled: bucketConfig.FlushEnabled,
-                            parallelDbAndViewCompaction: bucketConfig.ViewCompaction,
                             saslPassword: bucketConfig.BucketPassword,
                             threadNumber: bucketConfig.ThreadNumber
                             );

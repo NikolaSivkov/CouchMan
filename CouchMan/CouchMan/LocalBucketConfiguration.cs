@@ -28,7 +28,6 @@ namespace CouchMan
         public bool FlushEnabled { get; set; }
         public AuthType AuthType { get; set; }
         public string BucketPassword { get; set; }
-        public bool ViewCompaction { get; set; }
         public ThreadNumber ThreadNumber { get; set; }
     }
 }
