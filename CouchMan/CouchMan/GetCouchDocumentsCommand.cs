@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -46,7 +46,7 @@ namespace CouchMan
         [Parameter(Mandatory = false)]
         public string BucketPassword { get; set; }
 
-        protected override void ProcessRecord()
+        protected override async void ProcessRecord()
         {
 
             var clientConfig = new ClientConfiguration();
@@ -78,26 +78,24 @@ namespace CouchMan
             }
 
             var query = workBucket.CreateQuery(DesignDoc, View);
+            
             var results = workBucket.Query<dynamic>(query);
-
-            var keys = results.Rows.Select(x=>x.Id);
-
-            var multiget = workBucket.Get<dynamic>(keys.ToList(), new ParallelOptions
+            
+            foreach (var operationResult in results.Rows.ToList())
             {
-                MaxDegreeOfParallelism = 10
-            },
-            10);
- 
-            foreach (var operationResult in multiget)
-            {
-                if (operationResult.Value.Success)
+                try
                 {
-                    var doc = operationResult.Value.Value;
+                    var doc = operationResult.Value;
 
                     string serializedValues = JsonConvert.SerializeObject(doc, Formatting.Indented);
 
                     File.WriteAllText(localSavePath + $"\\{operationResult.Key}.json", serializedValues);
                     WriteObject($"saved {operationResult.Key}");
+                }
+                catch (Exception ex)
+                {
+                    WriteError(new ErrorRecord(ex, ex.Message, ErrorCategory.InvalidData, operationResult));
+                    
                 }
             }
              
