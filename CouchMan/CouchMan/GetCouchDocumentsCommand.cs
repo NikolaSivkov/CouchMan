@@ -89,7 +89,15 @@ namespace CouchMan
 
                     string serializedValues = JsonConvert.SerializeObject(doc, Formatting.Indented);
 
-                    File.WriteAllText(localSavePath + $"\\{operationResult.Key}.json", serializedValues);
+                    string filename = operationResult.Key.ToString();
+
+                    foreach (var c in Path.GetInvalidFileNameChars())
+                    {
+                        filename = filename.Replace(c.ToString(),string.Empty);
+                    }
+
+                    File.WriteAllText(localSavePath + $"\\{filename}.json", serializedValues);
+
                     WriteObject($"saved {operationResult.Key}");
                 }
                 catch (Exception ex)
