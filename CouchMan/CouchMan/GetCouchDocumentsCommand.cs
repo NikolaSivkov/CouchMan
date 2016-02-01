@@ -34,6 +34,14 @@ namespace CouchMan
         [Parameter(Mandatory = true)]
         public string Bucket { get; set; }
 
+        [Alias("d")]
+        [Parameter(Mandatory = true)]
+        public string DesignDoc { get; set; }
+
+        [Alias("v")]
+        [Parameter(Mandatory = true)]
+        public string View { get; set; }
+
         [Alias("bpw")]
         [Parameter(Mandatory = false)]
         public string BucketPassword { get; set; }
@@ -69,7 +77,7 @@ namespace CouchMan
                 return;
             }
 
-            var query = workBucket.CreateQuery("beer", "brewery_beers");
+            var query = workBucket.CreateQuery(DesignDoc, View);
             var results = workBucket.Query<dynamic>(query);
 
             var keys = results.Rows.Select(x=>x.Id);
