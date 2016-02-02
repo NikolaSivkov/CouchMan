@@ -80,12 +80,25 @@ namespace CouchMan
             var query = workBucket.CreateQuery(DesignDoc, View);
             
             var results = workBucket.Query<dynamic>(query);
-            
-            foreach (var operationResult in results.Rows.ToList())
+
+            var  keys = results.Rows.Select(x => x.Id);
+
+            WriteObject("Fetching Data");
+            var multiget = workBucket.Get<dynamic>(keys.ToList(), new ParallelOptions
+            {
+                MaxDegreeOfParallelism = 20
+            },
+            20);
+
+            WriteObject("Done fetching");
+
+            WriteObject($"Writing Files to: {localSavePath}");
+
+            foreach (var operationResult in multiget)
             {
                 try
                 {
-                    var doc = operationResult.Value;
+                    var doc = operationResult.Value.Value;
 
                     string serializedValues = JsonConvert.SerializeObject(doc, Formatting.Indented);
 
